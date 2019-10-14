@@ -112,10 +112,11 @@ class RequestHandler(object):
         self._has_named_kw_args = has_named_kw_args(fn)
         self._named_kw_args = get_named_kw_args(fn)
         self._required_kw_args = get_required_kw_args(fn)
+        logging.info('request handler inited %s' % self._func.__name__)
 
-    @asyncio.coroutine
-    def __call__(self, request):
+    async def __call__(self, request):
         kw = None
+        logging.info('calling handler %s' % self._func.__name__)
         # parse args according to the request method
         if self._has_var_kw_arg or self._has_named_kw_args or self._required_kw_args:
             if request.method == 'POST':
@@ -123,12 +124,12 @@ class RequestHandler(object):
                     return web.HTTPBadRequest('Missing Content Type.')
                 ct = request.content_type.lower()
                 if ct.startswith('application/json'):
-                    params = yield from request.json()
+                    params = await request.json()
                     if not isinstance(params, dict):
                         return web.HTTPBadRequest('JSON body must be dict object.')
                     kw = params
                 elif ct.startswith('application/x-www-form-urlencoded') or ct.startswith('multipart/form-data'):
-                    params = yield from request.post()
+                    params = await request.post()
                     kw = dict(**params)
                 else:
                     return web.HTTPBadRequest('Unsupported Content-Type: %s' % request.content_type)
@@ -160,7 +161,7 @@ class RequestHandler(object):
         logging.info('call with args: %s' % str(kw))
         # execute handler
         try:
-            r = yield from self._func(**kw)
+            r = await self._func(**kw)
             return r
         except APIError as e:
             return dict(error=e.error, data=e.data, message=e.message)
@@ -179,6 +180,7 @@ def add_route(app, fn):
 
 # register all handlers in module_name
 def add_routers(app, module_name):
+    logging.info('coroweb add routes test version')
     n = module_name.rfind('.')
     if n == (-1):
         mod = __import__(module_name, globals(), locals())
