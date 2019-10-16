@@ -7,7 +7,7 @@ __author__ = 'Jerry Bai'
 Setting up configurations
 '''
 
-import config_default
+import conf.config_default
 
 
 class Dict(dict):
@@ -52,7 +52,7 @@ def merge(default, override):
     return r
 
 
-configs = config_default.configs
+configs = conf.config_default.configs
 
 try:
     import config_override

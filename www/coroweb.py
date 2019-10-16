@@ -7,6 +7,7 @@ import asyncio
 import functools
 import logging
 import inspect
+import os
 from urllib import parse
 
 from aiohttp import web
@@ -112,11 +113,9 @@ class RequestHandler(object):
         self._has_named_kw_args = has_named_kw_args(fn)
         self._named_kw_args = get_named_kw_args(fn)
         self._required_kw_args = get_required_kw_args(fn)
-        logging.info('request handler inited %s' % self._func.__name__)
 
     async def __call__(self, request):
         kw = None
-        logging.info('calling handler %s' % self._func.__name__)
         # parse args according to the request method
         if self._has_var_kw_arg or self._has_named_kw_args or self._required_kw_args:
             if request.method == 'POST':
@@ -158,13 +157,19 @@ class RequestHandler(object):
             for name in self._required_kw_args:
                 if name not in kw:
                     return web.HTTPBadRequest('Missing argument: %s' % name)
-        logging.info('call with args: %s' % str(kw))
+        logging.info('call handler %s with args: %s' % (self._func.__name__, str(kw)))
         # execute handler
         try:
             r = await self._func(**kw)
             return r
         except APIError as e:
             return dict(error=e.error, data=e.data, message=e.message)
+
+
+def add_static(app):
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static')
+    app.router.add_static('/static/', path)
+    logging.info('add static %s => %s' % ('/static/', path))
 
 
 def add_route(app, fn):
@@ -174,7 +179,8 @@ def add_route(app, fn):
         raise ValueError('@get or @post not defined in %s.' % str(fn))
     if not asyncio.iscoroutinefunction(fn) and not inspect.isgeneratorfunction(fn):
         fn = asyncio.coroutine(fn)
-    logging.info('add route %s %s => %s(%s)' % (method, path, fn.__name__, ', '.join(inspect.signature(fn).parameters.keys())))
+    logging.info(
+        'add route %s %s => %s(%s)' % (method, path, fn.__name__, ', '.join(inspect.signature(fn).parameters.keys())))
     app.router.add_route(method, path, RequestHandler(app, fn))
 
 
@@ -185,7 +191,7 @@ def add_routers(app, module_name):
     if n == (-1):
         mod = __import__(module_name, globals(), locals())
     else:
-        name = module_name[n+1:]
+        name = module_name[n + 1:]
         mod = getattr(__import__(module_name[:n], globals(), locals(), [name]), name)
     for attr in dir(mod):
         if attr.startswith('_'):
